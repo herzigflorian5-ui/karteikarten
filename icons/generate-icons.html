@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Icons generieren</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #10111b; color: #eeeef6; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 40px; }
+    canvas { border-radius: 40px; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+    a { display: inline-block; background: #58cc02; color: #091400; font-weight: 700; padding: 12px 24px; border-radius: 12px; text-decoration: none; }
+    p { color: #7a7e9b; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h2>Karteikarten — App-Icons generieren</h2>
+  <p>Öffne diese Datei im Browser, dann speichere die Icons als PNG.</p>
+
+  <canvas id="c192" width="192" height="192"></canvas>
+  <a id="dl192">icon-192.png herunterladen</a>
+
+  <canvas id="c512" width="512" height="512"></canvas>
+  <a id="dl512">icon-512.png herunterladen</a>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const s = canvas.width;
+
+      // Background
+      ctx.fillStyle = '#10111b';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, s, s, s * 0.21);
+      ctx.fill();
+
+      // Green card shape (back)
+      ctx.fillStyle = '#3a8a02';
+      ctx.beginPath();
+      ctx.roundRect(s * .18, s * .22, s * .6, s * .44, s * .07);
+      ctx.fill();
+
+      // Main card
+      ctx.fillStyle = '#1c1f2f';
+      ctx.beginPath();
+      ctx.roundRect(s * .22, s * .30, s * .6, s * .44, s * .07);
+      ctx.fill();
+
+      // Green accent line
+      ctx.fillStyle = '#58cc02';
+      ctx.beginPath();
+      ctx.roundRect(s * .35, s * .43, s * .34, s * .04, s * .02);
+      ctx.fill();
+
+      ctx.fillStyle = '#7a7e9b';
+      ctx.beginPath();
+      ctx.roundRect(s * .35, s * .53, s * .22, s * .03, s * .015);
+      ctx.fill();
+    }
+
+    [192, 512].forEach(size => {
+      const canvas = document.getElementById('c' + size);
+      drawIcon(canvas);
+      const dl = document.getElementById('dl' + size);
+      dl.href = canvas.toDataURL('image/png');
+      dl.download = 'icon-' + size + '.png';
+    });
+  </script>
+</body>
+</html>

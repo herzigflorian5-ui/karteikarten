@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Karteikarten</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; max-width: 600px; margin: 0 auto; min-height: 100vh; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .header { background: #1d4ed8; color: white; padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 10; }
+    .header h1 { font-size: 18px; font-weight: 600; flex: 1; }
+    .header-btn { background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1; }
+    .header-btn:active { background: rgba(255,255,255,.2); }
+
+    .content { padding: 16px; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 18px; border-radius: 10px; border: none; cursor: pointer; font-size: 15px; font-weight: 500; font-family: inherit; transition: opacity .15s; }
+    .btn:active { opacity: .75; }
+    .btn-primary   { background: #1d4ed8; color: white; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+    .btn-teal      { background: #0891b2; color: white; }
+    .btn-block     { display: flex; width: 100%; }
+    .btn + .btn    { margin-top: 8px; }
+
+    .list { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .list-item { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); display: flex; align-items: stretch; overflow: hidden; }
+    .list-link { flex: 1; padding: 15px 16px; color: #1e293b; text-decoration: none; display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+    .list-link:active { background: #f1f5f9; }
+    .list-del { background: none; border: none; padding: 0 14px; color: #ef4444; font-size: 20px; cursor: pointer; border-left: 1px solid #f1f5f9; }
+    .list-del:active { background: #fee2e2; }
+    .badge { background: #dbeafe; color: #1d4ed8; border-radius: 99px; padding: 2px 8px; font-size: 12px; font-weight: 500; }
+    .badge-red   { background: #fee2e2; color: #dc2626; }
+    .badge-green { background: #dcfce7; color: #16a34a; }
+    .empty-note { text-align: center; color: #94a3b8; padding: 30px 0; font-size: 14px; }
+
+    /* Intervals box in set view */
+    .iv-box { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-top: 8px; overflow: hidden; }
+    .iv-box-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; }
+    .iv-box-header:active { background: #f8fafc; }
+    .iv-box-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; }
+    .iv-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+    .iv-chip { background: #dbeafe; color: #1d4ed8; border-radius: 6px; padding: 3px 8px; font-size: 13px; font-weight: 600; }
+    .iv-edit-toggle { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+    .iv-editor { padding: 4px 12px 14px; border-top: 1px solid #f1f5f9; display: none; }
+    .iv-editor.open { display: block; }
+
+    /* Interval editor rows */
+    .iv-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .iv-row input[type=number] { width: 68px; flex-shrink: 0; padding: 9px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 15px; font-family: inherit; }
+    .iv-row select { flex: 1; padding: 9px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 15px; font-family: inherit; background: white; appearance: none; -webkit-appearance: none; }
+    .iv-row input:focus, .iv-row select:focus { outline: none; border-color: #1d4ed8; }
+    .iv-row-preview { font-size: 13px; color: #64748b; min-width: 62px; text-align: right; }
+    .iv-del { background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 15px; flex-shrink: 0; }
+    .iv-del:active { background: #fecaca; }
+    .iv-editor-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .iv-editor-actions .btn { padding: 10px 14px; font-size: 14px; }
+
+    /* Card flip */
+    .card-wrap { perspective: 1200px; margin: 12px 0 0; cursor: pointer; user-select: none; }
+    .card-inner { position: relative; width: 100%; min-height: 240px; transition: transform .45s cubic-bezier(.4,0,.2,1); transform-style: preserve-3d; }
+    .card-inner.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; min-height: 240px; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+    .card-front { background: white; border: 2px solid #1d4ed8; }
+    .card-back  { background: #eff6ff; border: 2px solid #0891b2; transform: rotateY(180deg); }
+    .card-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
+    .card-text  { font-size: 20px; font-weight: 500; line-height: 1.4; }
+    .card-img   { max-width: 100%; max-height: 170px; border-radius: 10px; object-fit: contain; margin-bottom: 10px; }
+
+    /* Interval bar (study mode) */
+    .iv-bar { position: fixed; bottom: 0; left: 0; right: 0; max-width: 600px; margin: 0 auto; background: white; border-top: 1px solid #e2e8f0; padding: 10px 12px 20px; display: flex; gap: 7px; box-shadow: 0 -4px 16px rgba(0,0,0,.08); transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); }
+    .iv-bar.visible { transform: translateY(0); }
+    .iv-btn { flex: 1; padding: 13px 4px; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; color: white; background: #1d4ed8; cursor: pointer; line-height: 1.2; transition: opacity .15s; }
+    .iv-btn:active { opacity: .7; }
+
+    /* Progress */
+    .study-progress { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .progress-bar-bg { flex: 1; height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: #1d4ed8; border-radius: 99px; transition: width .3s; }
+    .progress-text { font-size: 13px; color: #64748b; white-space: nowrap; }
+    .study-hint { text-align: center; color: #94a3b8; font-size: 13px; margin-top: 10px; }
+    .study-content { padding: 14px 16px 110px; }
+
+    /* Done */
+    .done-wrap { text-align: center; padding: 60px 24px 30px; }
+    .done-emoji { font-size: 72px; line-height: 1; margin-bottom: 20px; }
+    .done-wrap h2 { font-size: 26px; margin-bottom: 8px; }
+    .done-wrap p { color: #64748b; margin-bottom: 28px; }
+
+    /* Form */
+    .form-group { margin-bottom: 18px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+    .form-input, .form-textarea { width: 100%; padding: 11px 13px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-family: inherit; background: white; color: #1e293b; transition: border-color .15s; }
+    .form-input:focus, .form-textarea:focus { outline: none; border-color: #1d4ed8; }
+    .form-textarea { min-height: 90px; resize: vertical; }
+    .form-btn-row { display: flex; gap: 8px; }
+    .form-btn-row .btn { flex: 1; }
+
+    /* Image upload */
+    .img-upload-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; background: #f1f5f9; border: 1.5px dashed #cbd5e1; border-radius: 10px; cursor: pointer; font-size: 14px; color: #475569; margin-top: 8px; font-family: inherit; }
+    .img-upload-btn:active { background: #e2e8f0; }
+    .paste-hint { display: block; font-size: 12px; color: #94a3b8; margin-top: 6px; }
+    .form-textarea.paste-flash { border-color: #22c55e; transition: border-color .1s; }
+    .img-preview-wrap { margin-top: 8px; position: relative; display: inline-block; }
+    .img-preview { max-width: 100%; max-height: 160px; border-radius: 10px; display: block; object-fit: contain; }
+    .img-remove { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.55); color: white; border: none; border-radius: 99px; width: 26px; height: 26px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+    /* Card table */
+    .cards-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .cards-table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; border-bottom: 2px solid #e2e8f0; background: #f8fafc; }
+    .cards-table td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid #f1f5f9; max-width: 0; width: 44%; }
+    .cards-table td.td-num { width: 8%; color: #94a3b8; font-size: 12px; text-align: right; padding-right: 8px; white-space: nowrap; }
+    .cards-table td.td-actions { width: 4%; white-space: nowrap; padding: 0 6px; }
+    .cards-table tr:hover td { background: #f8fafc; }
+    .td-cell { display: flex; flex-direction: column; gap: 6px; }
+    .td-thumb { max-width: 100%; max-height: 80px; border-radius: 6px; object-fit: contain; display: block; }
+    .td-text { white-space: pre-wrap; word-break: break-word; color: #1e293b; line-height: 1.4; }
+    .td-empty { color: #cbd5e1; font-style: italic; }
+    .tbl-edit-btn { background: none; border: none; font-size: 16px; cursor: pointer; padding: 8px 4px; color: #64748b; }
+    .tbl-edit-btn:hover { color: #1d4ed8; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; align-items: flex-end; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 20px 16px 32px; max-height: 92vh; overflow-y: auto; }
+    .modal-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 99px; margin: 0 auto 16px; }
+    .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="view-home" class="view active">
+  <div class="header"><h1>📚 Karteikarten</h1></div>
+  <div class="content">
+    <button class="btn btn-primary btn-block" onclick="openNameModal('folder')">+ Neuer Ordner</button>
+    <ul class="list" id="folder-list"></ul>
+  </div>
+</div>
+
+<!-- FOLDER -->
+<div id="view-folder" class="view">
+  <div class="header">
+    <button class="header-btn" onclick="goBack()">←</button>
+    <h1 id="folder-title">Ordner</h1>
+  </div>
+  <div class="content">
+    <button class="btn btn-primary btn-block" onclick="openNameModal('set')">+ Neues Set</button>
+    <ul class="list" id="set-list"></ul>
+  </div>
+</div>
+
+<!-- SET -->
+<div id="view-set" class="view">
+  <div class="header">
+    <button class="header-btn" onclick="goBack()">←</button>
+    <h1 id="set-title">Set</h1>
+  </div>
+  <div class="content">
+    <button class="btn btn-primary btn-block" id="study-start-btn" onclick="startStudy()">▶ Lernen</button>
+    <button class="btn btn-secondary btn-block" onclick="openCardEditor(null)">+ Karte hinzufügen</button>
+    <button class="btn btn-secondary btn-block" onclick="navigate('table', curSetId)">📋 Alle Karten (Tabelle)</button>
+
+    <!-- Interval box -->
+    <div class="iv-box">
+      <div class="iv-box-header" onclick="toggleIvEditor()">
+        <span class="iv-box-label">Intervalle</span>
+        <div class="iv-chips" id="iv-chips"></div>
+        <span class="iv-edit-toggle" id="iv-toggle-text">▾ bearbeiten</span>
+      </div>
+      <div class="iv-editor" id="iv-editor-set">
+        <div id="iv-rows"></div>
+        <div class="iv-editor-actions">
+          <button class="btn btn-secondary" onclick="addSetIvRow()">+ Hinzufügen</button>
+          <button class="btn btn-primary"   onclick="saveSetIntervals()">Speichern</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="list" id="card-list"></ul>
+  </div>
+</div>
+
+<!-- STUDY -->
+<div id="view-study" class="view">
+  <div class="header">
+    <button class="header-btn" onclick="goBack()">←</button>
+    <h1>Lernen</h1>
+  </div>
+  <div class="study-content">
+    <div class="study-progress">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="study-bar" style="width:0%"></div></div>
+      <span class="progress-text" id="study-count">0 / 0</span>
+    </div>
+    <div class="card-wrap" onclick="flipCard()">
+      <div class="card-inner" id="card-inner">
+        <div class="card-face card-front" id="card-front"></div>
+        <div class="card-face card-back"  id="card-back"></div>
+      </div>
+    </div>
+    <div class="study-hint" id="study-hint">Tippen um umzudrehen</div>
+  </div>
+  <div class="iv-bar" id="iv-bar"></div>
+</div>
+
+<!-- DONE -->
+<div id="view-done" class="view">
+  <div class="header">
+    <button class="header-btn" onclick="goBack()">←</button>
+    <h1>Fertig!</h1>
+  </div>
+  <div class="done-wrap">
+    <div class="done-emoji">🎉</div>
+    <h2>Alle Karten geschafft!</h2>
+    <p>Die heutigen Karten sind erledigt. Morgen geht's weiter!</p>
+    <button class="btn btn-primary" onclick="goBack()">Zurück zum Set</button>
+  </div>
+</div>
+
+<!-- TABLE VIEW -->
+<div id="view-table" class="view">
+  <div class="header">
+    <button class="header-btn" onclick="goBack()">←</button>
+    <h1 id="table-title">Alle Karten</h1>
+  </div>
+  <div class="content" style="padding:0; overflow-x:auto;">
+    <table class="cards-table" id="cards-table">
+      <thead>
+        <tr>
+          <th class="td-num">#</th>
+          <th>Vorderseite</th>
+          <th>Rückseite</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="cards-table-body"></tbody>
+    </table>
+    <p id="table-empty" style="display:none;text-align:center;color:#94a3b8;padding:30px">Noch keine Karten.</p>
+  </div>
+</div>
+
+<!-- CARD EDITOR MODAL -->
+<div class="modal-overlay" id="card-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="card-modal-title">Karte hinzufügen</h2>
+    <div class="form-group">
+      <label class="form-label">Vorderseite (Frage)</label>
+      <textarea class="form-textarea" id="front-text" placeholder="Frage eingeben…"></textarea>
+      <label class="img-upload-btn">🖼 Bild hinzufügen
+        <input type="file" accept="image/*" style="display:none" id="front-file" onchange="loadImg(this,'front')">
+      </label>
+      <span class="paste-hint">Screenshot aus Zwischenablage: Strg+V ins Textfeld einfügen</span>
+      <div class="img-preview-wrap" id="front-img-wrap" style="display:none">
+        <img class="img-preview" id="front-img-preview" alt="">
+        <button class="img-remove" onclick="removeImg('front')">✕</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rückseite (Antwort)</label>
+      <textarea class="form-textarea" id="back-text" placeholder="Antwort eingeben…"></textarea>
+      <label class="img-upload-btn">🖼 Bild hinzufügen
+        <input type="file" accept="image/*" style="display:none" id="back-file" onchange="loadImg(this,'back')">
+      </label>
+      <span class="paste-hint">Screenshot aus Zwischenablage: Strg+V ins Textfeld einfügen</span>
+      <div class="img-preview-wrap" id="back-img-wrap" style="display:none">
+        <img class="img-preview" id="back-img-preview" alt="">
+        <button class="img-remove" onclick="removeImg('back')">✕</button>
+      </div>
+    </div>
+    <div class="form-btn-row">
+      <button class="btn btn-primary"   onclick="saveCard(false)">Speichern</button>
+      <button class="btn btn-teal"      onclick="saveCard(true)">+ Nächste</button>
+      <button class="btn btn-secondary" onclick="closeCardModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAME MODAL -->
+<div class="modal-overlay" id="name-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="name-modal-title">Name</h2>
+    <div class="form-group">
+      <input class="form-input" type="text" id="name-input" placeholder="Name eingeben…">
+    </div>
+    <div class="form-btn-row">
+      <button class="btn btn-primary"   id="name-submit-btn">Erstellen</button>
+      <button class="btn btn-secondary" onclick="closeNameModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DB ====================
+let db;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('karteikarten_v3', 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('folders')) {
+        d.createObjectStore('folders', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!d.objectStoreNames.contains('sets')) {
+        const s = d.createObjectStore('sets', { keyPath: 'id', autoIncrement: true });
+        s.createIndex('folderId', 'folderId');
+      }
+      if (!d.objectStoreNames.contains('cards')) {
+        const s = d.createObjectStore('cards', { keyPath: 'id', autoIncrement: true });
+        s.createIndex('setId', 'setId');
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+function dbAll(store) {
+  return new Promise((res, rej) => {
+    const r = db.transaction(store,'readonly').objectStore(store).getAll();
+    r.onsuccess = () => res(r.result); r.onerror = e => rej(e.target.error);
+  });
+}
+function dbGet(store, key) {
+  return new Promise((res, rej) => {
+    const r = db.transaction(store,'readonly').objectStore(store).get(key);
+    r.onsuccess = () => res(r.result); r.onerror = e => rej(e.target.error);
+  });
+}
+function dbPut(store, obj) {
+  return new Promise((res, rej) => {
+    const r = db.transaction(store,'readwrite').objectStore(store).put(obj);
+    r.onsuccess = () => res(r.result); r.onerror = e => rej(e.target.error);
+  });
+}
+function dbDel(store, key) {
+  return new Promise((res, rej) => {
+    const r = db.transaction(store,'readwrite').objectStore(store).delete(key);
+    r.onsuccess = () => res(); r.onerror = e => rej(e.target.error);
+  });
+}
+function dbByIndex(store, idx, key) {
+  return new Promise((res, rej) => {
+    const r = db.transaction(store,'readonly').objectStore(store).index(idx).getAll(key);
+    r.onsuccess = () => res(r.result); r.onerror = e => rej(e.target.error);
+  });
+}
+
+// ==================== INTERVALS ====================
+const DEFAULT_INTERVALS = [
+  { value: 10, unit: 'Minuten' },
+  { value: 1,  unit: 'Tage'   },
+  { value: 3,  unit: 'Tage'   },
+  { value: 5,  unit: 'Tage'   },
+  { value: 1,  unit: 'Wochen' },
+];
+
+const UNIT_MS = { Minuten: 60_000, Tage: 86_400_000, Wochen: 604_800_000, Monate: 2_592_000_000 };
+const SINGULAR = { Minuten: 'Minute', Tage: 'Tag', Wochen: 'Woche', Monate: 'Monat' };
+
+function ivMs(iv)    { return iv.value * UNIT_MS[iv.unit]; }
+function ivLabel(iv) { return iv.value === 1 ? `1 ${SINGULAR[iv.unit]}` : `${iv.value} ${iv.unit}`; }
+
+// ==================== ROUTER ====================
+let routeHistory = [];
+
+async function navigate(route, id) {
+  routeHistory.push({ route, id });
+  await show(route, id);
+}
+
+function goBack() {
+  routeHistory.pop();
+  const prev = routeHistory[routeHistory.length - 1] || { route: 'home' };
+  show(prev.route, prev.id);
+}
+
+async function show(route, id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  (document.getElementById('view-' + route) || document.getElementById('view-home')).classList.add('active');
+  if (route === 'home')   await renderHome();
+  if (route === 'folder') await renderFolder(id);
+  if (route === 'set')    await renderSet(id);
+  if (route === 'study')  await renderStudy(id);
+  if (route === 'table')  await renderTable(id);
+}
+
+// ==================== HOME ====================
+async function renderHome() {
+  const folders = await dbAll('folders');
+  const list = document.getElementById('folder-list');
+  list.innerHTML = '';
+  if (!folders.length) {
+    list.innerHTML = '<li class="empty-note">Noch keine Ordner.<br>Erstelle deinen ersten!</li>';
+    return;
+  }
+  for (const f of folders) {
+    const sets = await dbByIndex('sets', 'folderId', f.id);
+    const li = document.createElement('li');
+    li.className = 'list-item';
+    li.innerHTML = `
+      <span class="list-link" onclick="navigate('folder',${f.id})">
+        📁 ${esc(f.name)} <span class="badge">${sets.length} Set${sets.length !== 1 ? 's' : ''}</span>
+      </span>
+      <button class="list-del" onclick="delFolder(${f.id})">🗑</button>`;
+    list.appendChild(li);
+  }
+}
+
+async function delFolder(id) {
+  if (!confirm('Ordner und alle Inhalte löschen?')) return;
+  const sets = await dbByIndex('sets', 'folderId', id);
+  for (const s of sets) {
+    const cards = await dbByIndex('cards', 'setId', s.id);
+    for (const c of cards) await dbDel('cards', c.id);
+    await dbDel('sets', s.id);
+  }
+  await dbDel('folders', id);
+  await renderHome();
+}
+
+// ==================== FOLDER ====================
+let curFolderId;
+
+async function renderFolder(folderId) {
+  curFolderId = folderId;
+  const folder = await dbGet('folders', folderId);
+  if (!folder) { await navigate('home'); return; }
+  document.getElementById('folder-title').textContent = folder.name;
+
+  const sets = await dbByIndex('sets', 'folderId', folderId);
+  const list = document.getElementById('set-list');
+  list.innerHTML = '';
+  if (!sets.length) { list.innerHTML = '<li class="empty-note">Noch keine Sets.</li>'; return; }
+
+  for (const s of sets) {
+    const cards = await dbByIndex('cards', 'setId', s.id);
+    const due = cards.filter(c => !c.nextReview || c.nextReview <= Date.now()).length;
+    const li = document.createElement('li');
+    li.className = 'list-item';
+    li.innerHTML = `
+      <span class="list-link" onclick="navigate('set',${s.id})">
+        📝 ${esc(s.name)}
+        <span class="badge">${cards.length} Karten</span>
+        ${due > 0 ? `<span class="badge badge-red">${due} fällig</span>` : ''}
+      </span>
+      <button class="list-del" onclick="delSet(${s.id})">🗑</button>`;
+    list.appendChild(li);
+  }
+}
+
+async function delSet(id) {
+  if (!confirm('Set und alle Karten löschen?')) return;
+  const cards = await dbByIndex('cards', 'setId', id);
+  for (const c of cards) await dbDel('cards', c.id);
+  await dbDel('sets', id);
+  await renderFolder(curFolderId);
+}
+
+// ==================== SET ====================
+let curSetId, ivEditorOpen = false;
+
+async function renderSet(setId) {
+  curSetId = setId;
+  ivEditorOpen = false;
+
+  const set = await dbGet('sets', setId);
+  if (!set) { await navigate('home'); return; }
+  document.getElementById('set-title').textContent = set.name;
+
+  const intervals = set.intervals || DEFAULT_INTERVALS;
+
+  // Lernen button
+  const cards = await dbByIndex('cards', 'setId', setId);
+  const due = cards.filter(c => !c.nextReview || c.nextReview <= Date.now()).length;
+  document.getElementById('study-start-btn').textContent =
+    due > 0 ? `▶ Lernen  (${due} fällig)` : '▶ Alle Karten wiederholen';
+
+  // Interval chips
+  const chips = document.getElementById('iv-chips');
+  chips.innerHTML = intervals.map(iv => `<span class="iv-chip">${ivLabel(iv)}</span>`).join('');
+
+  // Interval editor
+  document.getElementById('iv-editor-set').classList.remove('open');
+  document.getElementById('iv-toggle-text').textContent = '▾ bearbeiten';
+  buildSetIvRows(intervals);
+
+  // Card list
+  const list = document.getElementById('card-list');
+  list.innerHTML = '';
+  if (!cards.length) { list.innerHTML = '<li class="empty-note">Noch keine Karten.</li>'; return; }
+  for (const c of cards) {
+    const label = (c.front?.imageData ? '🖼 ' : '') + (c.front?.text || '').slice(0, 60) || '(leer)';
+    const now = Date.now();
+    let nextStr, badgeCls;
+    if (!c.nextReview)             { nextStr = 'Neu';    badgeCls = 'badge'; }
+    else if (c.nextReview <= now)  { nextStr = 'fällig'; badgeCls = 'badge badge-red'; }
+    else                           { nextStr = new Date(c.nextReview).toLocaleDateString('de-AT'); badgeCls = 'badge badge-green'; }
+    const li = document.createElement('li');
+    li.className = 'list-item';
+    li.innerHTML = `
+      <span class="list-link" onclick="openCardEditor(${c.id})">${esc(label)}<span class="${badgeCls}">${nextStr}</span></span>
+      <button class="list-del" onclick="delCard(${c.id})">🗑</button>`;
+    list.appendChild(li);
+  }
+}
+
+function toggleIvEditor() {
+  ivEditorOpen = !ivEditorOpen;
+  document.getElementById('iv-editor-set').classList.toggle('open', ivEditorOpen);
+  document.getElementById('iv-toggle-text').textContent = ivEditorOpen ? '▴ schließen' : '▾ bearbeiten';
+}
+
+function buildSetIvRows(intervals) {
+  const container = document.getElementById('iv-rows');
+  container.innerHTML = '';
+  intervals.forEach(iv => addRowToContainer(container, iv));
+}
+
+function addRowToContainer(container, iv) {
+  const row = document.createElement('div');
+  row.className = 'iv-row';
+  row.innerHTML = `
+    <input type="number" min="1" value="${iv.value}">
+    <select>
+      <option ${iv.unit==='Minuten'?'selected':''}>Minuten</option>
+      <option ${iv.unit==='Tage'   ?'selected':''}>Tage</option>
+      <option ${iv.unit==='Wochen' ?'selected':''}>Wochen</option>
+      <option ${iv.unit==='Monate' ?'selected':''}>Monate</option>
+    </select>
+    <span class="iv-row-preview">${ivLabel(iv)}</span>
+    <button class="iv-del" onclick="this.closest('.iv-row').remove()">✕</button>`;
+  const numEl  = row.querySelector('input');
+  const selEl  = row.querySelector('select');
+  const prevEl = row.querySelector('.iv-row-preview');
+  const upd = () => { prevEl.textContent = ivLabel({ value: parseInt(numEl.value)||1, unit: selEl.value }); };
+  numEl.addEventListener('input',  upd);
+  selEl.addEventListener('change', upd);
+  container.appendChild(row);
+}
+
+function addSetIvRow() {
+  addRowToContainer(document.getElementById('iv-rows'), { value: 1, unit: 'Tage' });
+}
+
+async function saveSetIntervals() {
+  const rows = document.querySelectorAll('#iv-rows .iv-row');
+  const intervals = [];
+  rows.forEach(row => {
+    const v = Math.max(1, parseInt(row.querySelector('input').value) || 1);
+    const u = row.querySelector('select').value;
+    intervals.push({ value: v, unit: u });
+  });
+  if (!intervals.length) { alert('Mindestens ein Intervall ist erforderlich.'); return; }
+
+  const set = await dbGet('sets', curSetId);
+  set.intervals = intervals;
+  await dbPut('sets', set);
+
+  // Update chips
+  document.getElementById('iv-chips').innerHTML =
+    intervals.map(iv => `<span class="iv-chip">${ivLabel(iv)}</span>`).join('');
+
+  toggleIvEditor();
+}
+
+async function delCard(id) {
+  if (!confirm('Karte löschen?')) return;
+  await dbDel('cards', id);
+  await renderSet(curSetId);
+}
+
+async function startStudy() {
+  const cards = await dbByIndex('cards', 'setId', curSetId);
+  if (!cards.length) { alert('Noch keine Karten in diesem Set.'); return; }
+  const due = cards.filter(c => !c.nextReview || c.nextReview <= Date.now());
+  if (!due.length) { alert('Alle Karten erledigt! Schau morgen wieder rein.'); return; }
+  studyQueue = due.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
+  studyIndex = 0;
+  await navigate('study', curSetId);
+}
+
+// ==================== TABLE ====================
+async function renderTable(setId) {
+  const set = await dbGet('sets', setId);
+  if (!set) { goBack(); return; }
+  document.getElementById('table-title').textContent = set.name;
+
+  const cards = await dbByIndex('cards', 'setId', setId);
+  const tbody = document.getElementById('cards-table-body');
+  const empty = document.getElementById('table-empty');
+  tbody.innerHTML = '';
+
+  if (!cards.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  cards.forEach((card, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-num">${i + 1}</td>
+      <td>${cellHtml(card.front)}</td>
+      <td>${cellHtml(card.back)}</td>
+      <td class="td-actions">
+        <button class="tbl-edit-btn" onclick="tableEditCard(${card.id})" title="Bearbeiten">✏️</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function cellHtml(side) {
+  if (!side?.text && !side?.imageData) return '<span class="td-empty">—</span>';
+  let html = '<div class="td-cell">';
+  if (side.imageData) html += `<img class="td-thumb" src="${side.imageData}" alt="">`;
+  if (side.text)      html += `<span class="td-text">${esc(side.text)}</span>`;
+  html += '</div>';
+  return html;
+}
+
+async function tableEditCard(cardId) {
+  const card = await dbGet('cards', cardId);
+  curSetId = card.setId;
+  afterSaveView = 'table';
+  await openCardEditor(cardId);
+}
+
+// ==================== STUDY ====================
+let studyQueue = [], studyIndex = 0, isFlipped = false;
+
+async function renderStudy(setId) {
+  const set = await dbGet('sets', setId);
+  const intervals = set?.intervals || DEFAULT_INTERVALS;
+
+  const bar = document.getElementById('iv-bar');
+  bar.innerHTML = '';
+  bar.classList.remove('visible');
+  intervals.forEach(iv => {
+    const btn = document.createElement('button');
+    btn.className = 'iv-btn';
+    btn.textContent = ivLabel(iv);
+    btn.onclick = () => pickInterval(iv);
+    bar.appendChild(btn);
+  });
+
+  if (!studyQueue.length) {
+    const cards = await dbByIndex('cards', 'setId', setId);
+    studyQueue = cards.filter(c => !c.nextReview || c.nextReview <= Date.now())
+                      .sort((a, b) => (a.nextReview||0) - (b.nextReview||0));
+    studyIndex = 0;
+  }
+  showCard();
+}
+
+function showCard() {
+  if (studyIndex >= studyQueue.length) {
+    document.getElementById('iv-bar').classList.remove('visible');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-done').classList.add('active');
+    return;
+  }
+  isFlipped = false;
+  document.getElementById('card-inner').classList.remove('flipped');
+  document.getElementById('iv-bar').classList.remove('visible');
+  document.getElementById('study-hint').textContent = 'Tippen um umzudrehen';
+
+  const pct = (studyIndex / studyQueue.length * 100).toFixed(0);
+  document.getElementById('study-bar').style.width = pct + '%';
+  document.getElementById('study-count').textContent = `${studyIndex} / ${studyQueue.length}`;
+
+  const card = studyQueue[studyIndex];
+  renderFace('card-front', card.front, 'Frage');
+  renderFace('card-back',  card.back,  'Antwort');
+}
+
+function renderFace(elemId, side, label) {
+  const el = document.getElementById(elemId);
+  el.innerHTML = `<div class="card-label">${label}</div>`;
+  if (side?.imageData) {
+    const img = document.createElement('img');
+    img.className = 'card-img'; img.src = side.imageData; img.alt = '';
+    el.appendChild(img);
+  }
+  if (side?.text) {
+    const p = document.createElement('p');
+    p.className = 'card-text'; p.textContent = side.text;
+    el.appendChild(p);
+  }
+}
+
+function flipCard() {
+  if (isFlipped) return;
+  isFlipped = true;
+  document.getElementById('card-inner').classList.add('flipped');
+  document.getElementById('iv-bar').classList.add('visible');
+  document.getElementById('study-hint').textContent = 'Wähle ein Intervall ↓';
+}
+
+async function pickInterval(iv) {
+  const card = studyQueue[studyIndex];
+  card.nextReview = Date.now() + ivMs(iv);
+  await dbPut('cards', card);
+  studyIndex++;
+  showCard();
+}
+
+// ==================== CARD EDITOR ====================
+let editCardId = null, frontImgData = null, backImgData = null, afterSaveView = null;
+
+async function openCardEditor(cardId) {
+  editCardId = cardId; frontImgData = null; backImgData = null;
+  if (cardId === null) afterSaveView = null; // reset when opening fresh from set view
+  ['front-text','back-text'].forEach(id => document.getElementById(id).value = '');
+  ['front-file','back-file'].forEach(id => document.getElementById(id).value = '');
+  ['front-img-wrap','back-img-wrap'].forEach(id => document.getElementById(id).style.display = 'none');
+
+  if (cardId) {
+    const card = await dbGet('cards', cardId);
+    document.getElementById('card-modal-title').textContent = 'Karte bearbeiten';
+    document.getElementById('front-text').value = card.front?.text || '';
+    document.getElementById('back-text').value  = card.back?.text  || '';
+    if (card.front?.imageData) { frontImgData = card.front.imageData; setImgPreview('front', frontImgData); }
+    if (card.back?.imageData)  { backImgData  = card.back.imageData;  setImgPreview('back',  backImgData); }
+  } else {
+    document.getElementById('card-modal-title').textContent = 'Karte hinzufügen';
+  }
+  document.getElementById('card-modal').classList.add('open');
+  setTimeout(() => document.getElementById('front-text').focus(), 100);
+}
+
+function setImgPreview(side, data) {
+  document.getElementById(side + '-img-preview').src = data;
+  document.getElementById(side + '-img-wrap').style.display = 'inline-block';
+}
+function loadImg(input, side) {
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => { if (side === 'front') { frontImgData = e.target.result; setImgPreview('front', frontImgData); } else { backImgData = e.target.result; setImgPreview('back', backImgData); } };
+  r.readAsDataURL(file);
+}
+function removeImg(side) {
+  if (side === 'front') { frontImgData = null; document.getElementById('front-img-wrap').style.display = 'none'; document.getElementById('front-file').value = ''; }
+  else                  { backImgData  = null; document.getElementById('back-img-wrap').style.display  = 'none'; document.getElementById('back-file').value  = ''; }
+}
+
+async function saveCard(andNext) {
+  const ft = document.getElementById('front-text').value.trim();
+  const bt = document.getElementById('back-text').value.trim();
+  if (!ft && !frontImgData) { alert('Die Vorderseite braucht Text oder ein Bild.'); return; }
+
+  const card = { setId: curSetId, front: { text: ft, imageData: frontImgData }, back: { text: bt, imageData: backImgData }, nextReview: null, createdAt: Date.now() };
+  if (editCardId) { const old = await dbGet('cards', editCardId); card.id = editCardId; card.nextReview = old.nextReview; card.createdAt = old.createdAt; }
+  await dbPut('cards', card);
+  closeCardModal();
+  if (andNext) {
+    afterSaveView = null;
+    openCardEditor(null);
+  } else if (afterSaveView === 'table') {
+    afterSaveView = null;
+    await renderTable(curSetId);
+  } else {
+    await renderSet(curSetId);
+  }
+}
+function closeCardModal() { document.getElementById('card-modal').classList.remove('open'); }
+
+// ==================== NAME MODAL ====================
+let nameCallback = null;
+
+function openNameModal(type) {
+  document.getElementById('name-modal-title').textContent = type === 'folder' ? 'Neuer Ordner' : 'Neues Set';
+  document.getElementById('name-input').value = '';
+
+  nameCallback = async name => {
+    if (type === 'folder') {
+      await dbPut('folders', { name, createdAt: Date.now() });
+      await renderHome();
+    } else {
+      await dbPut('sets', { name, folderId: curFolderId, intervals: DEFAULT_INTERVALS, createdAt: Date.now() });
+      await renderFolder(curFolderId);
+    }
+  };
+
+  document.getElementById('name-modal').classList.add('open');
+  setTimeout(() => document.getElementById('name-input').focus(), 100);
+}
+
+async function submitName() {
+  const name = document.getElementById('name-input').value.trim();
+  if (!name) return;
+  const cb = nameCallback;   // ← save BEFORE closeNameModal nulls it
+  closeNameModal();
+  if (cb) await cb(name);
+}
+
+function closeNameModal() {
+  document.getElementById('name-modal').classList.remove('open');
+  nameCallback = null;
+}
+
+document.getElementById('name-submit-btn').addEventListener('click', submitName);
+document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+
+document.getElementById('card-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCardModal(); });
+document.getElementById('name-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeNameModal(); });
+
+// ==================== UTILS ====================
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ==================== CLIPBOARD PASTE ====================
+function setupPasteHandlers() {
+  [['front-text', 'front'], ['back-text', 'back']].forEach(([textareaId, side]) => {
+    document.getElementById(textareaId).addEventListener('paste', e => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = ev => {
+            if (side === 'front') { frontImgData = ev.target.result; setImgPreview('front', frontImgData); }
+            else                  { backImgData  = ev.target.result; setImgPreview('back',  backImgData);  }
+            // brief green flash so the user sees it worked
+            const ta = document.getElementById(textareaId);
+            ta.classList.add('paste-flash');
+            setTimeout(() => ta.classList.remove('paste-flash'), 600);
+          };
+          reader.readAsDataURL(file);
+          return; // image handled, stop
+        }
+      }
+      // no image → let normal text paste happen
+    });
+  });
+}
+
+// ==================== INIT ====================
+openDB()
+  .then(() => { setupPasteHandlers(); return show('home'); })
+  .catch(err => { document.body.innerHTML = `<p style="padding:20px;color:red">DB-Fehler: ${err}</p>`; });
+</script>
+</body>
+</html>
