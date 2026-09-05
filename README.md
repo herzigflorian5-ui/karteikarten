@@ -16,6 +16,7 @@ Eine mobile-first Progressive Web App (PWA) für Spaced-Repetition-Lernen mit Go
 - **Bild-Upload** per Datei-Auswahl (auf iPhone: direkt Kamera oder Foto-Bibliothek)
 - **Screenshot einfügen** per Strg+V (Paste) direkt ins Textfeld
 - **„Speichern & Nächste"** für schnelles Durcharbeiten einer Lernliste
+- **Double-Submit-Schutz:** Speichern-Button deaktiviert sich sofort — mehrfaches Tippen erzeugt keine Duplikate
 
 ### Lern-Modus
 - Karte antippen → Flip-Animation → Antwort erscheint
@@ -23,6 +24,7 @@ Eine mobile-first Progressive Web App (PWA) für Spaced-Repetition-Lernen mit Go
 - Fälligste Karten werden zuerst gezeigt; neue Karten zuerst in der Queue
 - Fortschritts-Balken + Zähler während der Session
 - **Fertig-Screen** wenn alle fälligen Karten erledigt sind
+- **Bild-Vorladen:** Beim Start einer Lern-Session werden alle Bilder sofort parallel heruntergeladen und gecacht — danach funktionieren Bild-Karten auch ohne aktives Netzwerk (z.B. U-Bahn)
 
 ### Intervall-System (kein Algorithmus)
 Im Gegensatz zu Anki verwendet die App **feste, manuell gewählte Zeitintervalle**. Nach dem Umdrehen einer Karte wählt man selbst, wann man sie wieder sehen möchte. Die Intervalle sind pro Set anpassbar.
@@ -41,6 +43,8 @@ Im Gegensatz zu Anki verwendet die App **feste, manuell gewählte Zeitintervalle
 - **Dark Mode** als Standard, Light Mode per Schaltfläche umschaltbar (gespeichert im Browser)
 - Mobile-first: große Tap-Targets, Intervall-Tasten am unteren Bildschirmrand
 - **PWA-installierbar**: auf iPhone via Safari → „Zum Home-Bildschirm" (verhält sich wie eine native App)
+- **iPhone Safe Area:** Back-Button und Navigation respektieren Notch / Dynamic Island (`env(safe-area-inset-top/bottom)`)
+- **Lade-Indikator:** Grüner Spinner während Firebase-Daten geladen werden — kein unerwartetes Aufpoppen von Inhalten
 
 ---
 
@@ -116,7 +120,11 @@ users/
 
 ### Bilder (Firebase Storage)
 
-Bilder werden unter `users/{uid}/cards/{cardId}-{front|back}` gespeichert. In Firestore steht nur der Pfad (`storagePath`), nicht die Bilddaten selbst. Der Download-URL wird on-demand über `getDownloadURL()` abgerufen.
+Bilder werden unter `users/{uid}/cards/{cardId}-{front|back}` gespeichert. In Firestore steht nur der Pfad (`storagePath`), nicht die Bilddaten selbst.
+
+**URL-Caching:** `getImageUrl()` speichert jeden abgerufenen Download-URL in einer session-lokalen `Map`. Wiederholte Aufrufe für denselben Pfad (z.B. Editor nach Lernmodus) erzeugen keinen zweiten Firebase-Request.
+
+**Vorladen beim Lernstart:** `startStudy()` ruft alle Bild-URLs der fälligen Karten parallel via `Promise.all` ab und lädt die Bilder sofort per `new Image().src` in den Browser-Cache. Danach laufen Bild-Karten ohne Netzwerk-Anfragen.
 
 ### Router
 
@@ -178,5 +186,18 @@ Die Icons (`icons/icon-192.png` und `icons/icon-512.png`) müssen einmalig gener
 
 - **Desktop-Layout:** Die App ist primär für mobile Nutzung optimiert. Auf breiten Bildschirmen sind manche Elemente (z.B. Karten in der Tabellenansicht) breiter als nötig.
 - **Kein Import:** Es gibt keinen CSV- oder Anki-Import. Karten werden manuell angelegt.
-- **Offline eingeschränkt:** Der Service Worker cached die App Shell. Karteninhalte (insbesondere Bilder aus Firebase Storage) sind offline nur verfügbar, wenn sie vorher geladen wurden.
+- **Offline:** Bilder werden beim Lernstart vorgeladen und sind danach für die Dauer der Session aus dem Browser-Cache abrufbar. Wird die App direkt im U-Bahn-Tunnel geöffnet (noch nie geladen), stehen Bild-Karten nicht zur Verfügung.
 - **Keine Statistiken:** Es gibt keine Lernstatistiken oder Wiederholungshistorie.
+
+---
+
+## Changelog (letzte Änderungen)
+
+### iOS-Fixes & Performance (Sep 2026)
+- **Karteikarte füllt Bildschirm:** Root Cause war `display: block` statt `flex` in `showMainScreen()` — die gesamte Flex-Kette hat dadurch nicht funktioniert
+- **Bilder nutzen verfügbaren Platz:** `.card-img` bekommt `flex: 1; min-height: 0` statt fixer `max-height: 200px`. Kein Scroll innerhalb der Karte (`overflow: hidden`)
+- **Notch/Dynamic Island:** Top-Bar respektiert `env(safe-area-inset-top)`, Bottom-Bar bereits vorher korrekt
+- **iOS Auto-Zoom deaktiviert:** Alle Input-Felder auf `font-size: 16px` — darunter zoomt Safari beim Antippen automatisch rein
+- **Double-Submit-Schutz:** Speichern-Button deaktiviert sich sofort beim ersten Tippen
+- **Lade-Spinner:** CSS-Spinner erscheint während Firebase-Navigationen
+- **Bild-Vorladen:** Alle Session-Bilder werden beim Lernstart parallel gecacht (`Promise.all` + `new Image()`)
