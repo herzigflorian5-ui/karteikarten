@@ -1069,7 +1069,7 @@ function showLoginScreen() {
 
 function showMainScreen() {
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('main-screen').style.display  = 'block';
+  document.getElementById('main-screen').style.display  = 'flex';
 }
 
 async function initApp() {
