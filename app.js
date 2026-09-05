@@ -89,10 +89,15 @@ async function uploadImage(cardId, side, base64DataUrl) {
   return path;
 }
 
+const _urlCache = new Map();
+
 async function getImageUrl(storagePath) {
   if (!storagePath) return null;
+  if (_urlCache.has(storagePath)) return _urlCache.get(storagePath);
   try {
-    return await getDownloadURL(storageRef(storage, storagePath));
+    const url = await getDownloadURL(storageRef(storage, storagePath));
+    _urlCache.set(storagePath, url);
+    return url;
   } catch (e) {
     console.warn('Bild konnte nicht geladen werden:', e);
     return null;
@@ -676,6 +681,11 @@ async function startStudy() {
   if (!due.length) { alert('Alle Karten erledigt! Schau morgen wieder rein.'); return; }
   studyQueue = due.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
   studyIndex = 0;
+
+  // Alle Bild-URLs parallel vorabladen und in Browser-Cache legen
+  const paths = studyQueue.flatMap(c => [c.front?.storagePath, c.back?.storagePath]).filter(Boolean);
+  await Promise.all(paths.map(p => getImageUrl(p).then(url => { if (url) { new Image().src = url; } })));
+
   await navigate('study', curSetId);
 }
 
