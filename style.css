@@ -116,6 +116,27 @@ body {
   overflow-x: hidden;
 }
 
+/* === LOADING OVERLAY === */
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#loading-overlay.active { display: flex; }
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(128,128,128,0.25);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 img {
   max-width: 100%;
   height: auto;

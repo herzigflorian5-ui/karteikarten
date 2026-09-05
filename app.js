@@ -394,11 +394,17 @@ async function show(route, id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const viewEl = document.getElementById('view-' + route) || document.getElementById('view-home');
   viewEl.classList.add('active');
-  if (route === 'home')   await renderHome();
-  if (route === 'folder') await renderFolder(id);
-  if (route === 'set')    await renderSet(id);
-  if (route === 'study')  await renderStudy(id);
-  if (route === 'table')  await renderTable(id);
+  const overlay = document.getElementById('loading-overlay');
+  overlay.classList.add('active');
+  try {
+    if (route === 'home')   await renderHome();
+    if (route === 'folder') await renderFolder(id);
+    if (route === 'set')    await renderSet(id);
+    if (route === 'study')  await renderStudy(id);
+    if (route === 'table')  await renderTable(id);
+  } finally {
+    overlay.classList.remove('active');
+  }
 }
 
 // ==================== HOME ====================
@@ -919,6 +925,16 @@ async function saveCard(andNext) {
     return;
   }
 
+  const saveBtn     = document.getElementById('card-save-btn');
+  const saveNextBtn = document.getElementById('card-save-next-btn');
+  if (saveBtn.disabled) return;
+  saveBtn.disabled     = true;
+  saveNextBtn.disabled = true;
+  const origLabel      = saveBtn.textContent;
+  saveBtn.textContent  = 'Speichern…';
+
+  try {
+
   if (editCardId) {
     // -- EDIT EXISTING CARD --
     let newFrontPath = frontStoragePath;
@@ -984,6 +1000,14 @@ async function saveCard(andNext) {
     await renderTable(curSetId);
   } else {
     await renderSet(curSetId);
+  }
+
+  } catch (e) {
+    console.error('Fehler beim Speichern:', e);
+    alert('Fehler beim Speichern. Bitte nochmal versuchen.');
+    saveBtn.disabled     = false;
+    saveNextBtn.disabled = false;
+    saveBtn.textContent  = origLabel;
   }
 }
 
